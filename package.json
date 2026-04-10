@@ -1,0 +1,32 @@
+{
+  "name": "@openacp/workspace-plugin",
+  "version": "0.1.0",
+  "description": "Multi-user collaboration for shared OpenACP sessions",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "author": "OpenACP",
+  "license": "MIT",
+  "keywords": [
+    "openacp",
+    "openacp-plugin"
+  ],
+  "engines": {
+    "openacp": ">=2026.410.3"
+  },
+  "peerDependencies": {
+    "@openacp/cli": ">=2026.410.3"
+  },
+  "devDependencies": {
+    "@openacp/plugin-sdk": "file:../OpenACP/packages/plugin-sdk",
+    "nanoid": "^5.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^3.0.0"
+  }
+}
