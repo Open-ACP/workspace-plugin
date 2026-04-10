@@ -23,9 +23,11 @@
   "peerDependencies": {
     "@openacp/cli": ">=2026.410.3"
   },
+  "dependencies": {
+    "nanoid": "^5.0.0"
+  },
   "devDependencies": {
     "@openacp/plugin-sdk": "file:../OpenACP/packages/plugin-sdk",
-    "nanoid": "^5.0.0",
     "typescript": "^5.4.0",
     "vitest": "^3.0.0"
   }

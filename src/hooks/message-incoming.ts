@@ -21,6 +21,9 @@ export function registerMessageIncoming(
       const user = await registry.upsert({ identityId, source })
 
       // Attach sender to TurnMeta for downstream hooks
+      if (!meta) {
+        ctx.log.warn('message:incoming received without TurnMeta — sender identity will not propagate')
+      }
       if (meta) {
         meta[TURN_META_SENDER_KEY] = {
           identityId,

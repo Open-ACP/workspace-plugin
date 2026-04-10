@@ -108,6 +108,10 @@ describe('agent:beforePrompt hook', () => {
     await handler(payload, async () => payload)
 
     expect(payload.text).toContain('[System: Team session.')
+    // System prompt should come BEFORE the sender prefix, not inside it
+    const systemIdx = payload.text.indexOf('[System:')
+    const senderIdx = payload.text.indexOf('[Lucas]:')
+    expect(systemIdx).toBeLessThan(senderIdx)
     // After injection, flag should be set
     const session = await store.get()
     expect(session?.systemPromptInjected).toBe(true)

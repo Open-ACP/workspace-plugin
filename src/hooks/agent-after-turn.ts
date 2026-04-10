@@ -22,6 +22,12 @@ export function registerAgentAfterTurn(
           type: 'text' as const,
           text: `🤖 The agent mentioned @${user?.username ?? mentionedId}. Your input may be needed.`,
         })
+        await ctx.emitHook('mention', {
+          sessionId,
+          turnId,
+          mentionedBy: 'agent',
+          mentionedUser: mentionedId,
+        })
       }
       return next()
     },

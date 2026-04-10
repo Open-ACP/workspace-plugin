@@ -18,28 +18,36 @@ function setup(sessionId = 'sess-1') {
 
 describe('/teamwork command', () => {
   it('activates teamwork mode', async () => {
-    const { getStore } = setup()
+    const { ctx, getStore } = setup()
     await getStore('sess-1').init('telegram:123')
-    const cmd = makeTeamworkCommand(getStore)
+    const cmd = makeTeamworkCommand(getStore, ctx)
     const result = await cmd.handler({ raw: '', sessionId: 'sess-1', channelId: 'telegram', userId: '123', reply: async () => {} })
     expect(result).toMatchObject({ type: 'text' })
     expect((result as any).text).toContain('Team mode activated')
   })
 
   it('returns "already in team mode" when called twice', async () => {
-    const { getStore } = setup()
+    const { ctx, getStore } = setup()
     await getStore('sess-1').init('telegram:123')
     await getStore('sess-1').activateTeamwork()
-    const cmd = makeTeamworkCommand(getStore)
+    const cmd = makeTeamworkCommand(getStore, ctx)
     const result = await cmd.handler({ raw: '', sessionId: 'sess-1', channelId: 'telegram', userId: '123', reply: async () => {} })
     expect((result as any).text).toContain('Already in team mode')
   })
 
   it('returns error without active session', async () => {
-    const { getStore } = setup()
-    const cmd = makeTeamworkCommand(getStore)
+    const { ctx, getStore } = setup()
+    const cmd = makeTeamworkCommand(getStore, ctx)
     const result = await cmd.handler({ raw: '', sessionId: null, channelId: 'telegram', userId: '123', reply: async () => {} })
     expect(result).toMatchObject({ type: 'error' })
+  })
+
+  it('returns error when session not yet initialized', async () => {
+    const { ctx, getStore } = setup()
+    const cmd = makeTeamworkCommand(getStore, ctx)
+    const result = await cmd.handler({ raw: '', sessionId: 'sess-1', channelId: 'telegram', userId: '123', reply: async () => {} })
+    expect(result).toMatchObject({ type: 'error' })
+    expect((result as any).message).toContain('Send a message first')
   })
 })
 

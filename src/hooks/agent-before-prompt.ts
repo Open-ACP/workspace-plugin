@@ -47,37 +47,50 @@ export function registerAgentBeforePrompt(
         presence.markActive(store, sessionId, sender.identityId)
 
         // Ensure sender is in participants list
-        await store.addParticipant(sender.identityId)
+        const isNewParticipant = await store.addParticipant(sender.identityId)
+        if (isNewParticipant && session?.type === 'teamwork') {
+          await ctx.emitHook('userJoined', { sessionId, identityId: sender.identityId, role: 'member' })
+        }
       }
 
       // --- Teamwork-only behavior below ---
       session = await store.get()
       if (session?.type !== 'teamwork') return next()
 
-      // Inject team system prompt on first turn after teamwork activation
-      if (!session.systemPromptInjected && sender) {
-        const participantNames = session.participants
-          .map(p => `${p.identityId} (${p.role})`)
-          .join(', ')
-        ;(payload as any).text = `${TEAM_SYSTEM_PROMPT(participantNames)}\n\n${(payload as any).text}`
-        await store.markSystemPromptInjected()
-      }
+      let userText: string = (payload as any).text
 
-      // Prefix sender name
+      // 1. Prefix sender name on the user's text
       if (sender) {
         const name = sender.username
           ? `${sender.displayName} (@${sender.username})`
           : sender.displayName
-        ;(payload as any).text = `[${name}]: ${(payload as any).text}`
+        userText = `[${name}]: ${userText}`
       }
 
-      // Notify in-thread for user @mentions
+      // 2. Inject team system prompt BEFORE the prefixed text (on first turn after activation)
+      if (!session.systemPromptInjected && sender) {
+        const participantNames = session.participants
+          .map(p => `${p.identityId} (${p.role})`)
+          .join(', ')
+        userText = `${TEAM_SYSTEM_PROMPT(participantNames)}\n\n${userText}`
+        await store.markSystemPromptInjected()
+      }
+
+      ;(payload as any).text = userText
+
+      // 3. Notify in-thread for user @mentions and emit hook for SSE
       const mentionedIds = (meta?.[TURN_META_MENTIONS_KEY] as string[]) ?? []
       for (const mentionedId of mentionedIds) {
         const mentionedUser = await registry.getById(mentionedId)
         await ctx.sendMessage(sessionId, {
           type: 'text' as const,
           text: `📢 ${sender?.displayName ?? 'Someone'} mentioned @${mentionedUser?.username ?? mentionedId} in this session.`,
+        })
+        await ctx.emitHook('mention', {
+          sessionId,
+          turnId,
+          mentionedBy: sender?.identityId ?? 'unknown',
+          mentionedUser: mentionedId,
         })
       }
 
