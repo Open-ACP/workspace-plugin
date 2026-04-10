@@ -1,107 +1,125 @@
-import type { OpenACPPlugin, PluginContext, InstallContext, MigrateContext } from '@openacp/plugin-sdk'
+import type { OpenACPPlugin, PluginContext } from '@openacp/plugin-sdk'
+import { UserRegistry } from './identity.js'
+import { SessionStore } from './session-store.js'
+import { MessageStore } from './message-store.js'
+import { PresenceTracker } from './presence.js'
+import { WorkspaceSseManager } from './api/sse.js'
+import { workspaceRoutes } from './api/routes.js'
+import { registerMessageIncoming } from './hooks/message-incoming.js'
+import { registerAgentBeforePrompt } from './hooks/agent-before-prompt.js'
+import { registerAgentAfterTurn } from './hooks/agent-after-turn.js'
+import { registerTurnLifecycle } from './hooks/turn-lifecycle.js'
+import { registerSessionDestroy } from './hooks/session-destroy.js'
+import { registerCommands } from './commands/index.js'
 
 const plugin: OpenACPPlugin = {
   name: '@openacp/workspace-plugin',
   version: '0.1.0',
   description: 'Multi-user collaboration for shared OpenACP sessions',
 
-  // Declare which permissions your plugin needs.
-  // Available: events:read, events:emit, services:register, services:use,
-  //            middleware:register, commands:register, storage:read, storage:write, kernel:access
-  permissions: ['events:read', 'services:register'],
+  permissions: [
+    'events:read',
+    'middleware:register',
+    'commands:register',
+    'storage:read',
+    'storage:write',
+    'services:use',
+    'sessions:read',
+  ],
 
-  // Dependencies on other plugins (loaded before this one).
-  // pluginDependencies: { '@openacp/security': '>=1.0.0' },
-
-  // Optional dependencies (used if available, gracefully degrade if not).
-  // optionalPluginDependencies: { '@openacp/usage': '>=1.0.0' },
-
-  /**
-   * Called during server startup in dependency order.
-   * Register services, middleware, commands, and event listeners here.
-   */
   async setup(ctx: PluginContext): Promise<void> {
-    ctx.log.info('Plugin setup started')
+    // Core data modules
+    const registry = new UserRegistry(ctx.storage)
+    const presence = new PresenceTracker()
+    const sse = new WorkspaceSseManager()
 
-    // Example: register a service
-    // ctx.registerService('my-service', myServiceImpl)
+    const getSessionStore = (sessionId: string) =>
+      new SessionStore(ctx.storage.forSession(sessionId), sessionId)
+    const getMessageStore = (sessionId: string) =>
+      new MessageStore(ctx.storage.forSession(sessionId))
+    const getSessionStorage = (sessionId: string) =>
+      ctx.storage.forSession(sessionId)
+    const isTeamwork = async (sessionId: string) => {
+      const s = await getSessionStore(sessionId).get()
+      return s?.type === 'teamwork'
+    }
 
-    // Example: listen to events
-    // ctx.on('session:created', (event) => { ... })
+    // Register middleware hooks
+    registerMessageIncoming(ctx, registry, presence)
+    registerAgentBeforePrompt(ctx, registry, getSessionStore, getMessageStore, presence)
+    registerAgentAfterTurn(ctx, registry, isTeamwork)
+    registerTurnLifecycle(ctx, getSessionStore, presence)
+    registerSessionDestroy(ctx, getSessionStorage)
 
-    // Example: register a slash command
-    // ctx.registerCommand({
-    //   name: 'mycommand',
-    //   description: 'Does something useful',
-    //   category: 'plugin',
-    //   async handler(args) {
-    //     return { type: 'text', text: 'Hello from @openacp/workspace-plugin!' }
-    //   },
-    // })
+    // Declare custom hooks (other plugins can subscribe to these)
+    ctx.defineHook('teamworkActivated')
+    ctx.defineHook('userJoined')
+    ctx.defineHook('userLeft')
+    ctx.defineHook('taskAssigned')
+    ctx.defineHook('handoff')
+    ctx.defineHook('mention')
 
-    ctx.log.info('Plugin setup complete')
+    // Register chat commands
+    registerCommands(ctx, registry, getSessionStore)
+
+    // Register REST/SSE routes via api-server service (optional dependency)
+    const apiServer = ctx.getService<{ registerPlugin(prefix: string, plugin: any, opts?: { auth?: boolean }): void }>('api-server')
+    if (apiServer) {
+      apiServer.registerPlugin('/workspace', async (app: any) => {
+        await workspaceRoutes(app, { registry, getSessionStore, getMessageStore, sse })
+      }, { auth: true })
+      ctx.log.info('Workspace REST API registered at /workspace')
+    } else {
+      ctx.log.warn('api-server service not available — REST/SSE disabled')
+    }
+
+    // Wire SSE event push by observing plugin hooks via middleware on the full qualified name.
+    // emitHook fires through the middleware chain (not EventBus), so we use registerMiddleware
+    // with the fully-qualified hook name to observe without modifying the payload.
+    const anyCtx = ctx as any
+    anyCtx.registerMiddleware(`plugin:${plugin.name}:mention`, {
+      handler: async (payload: any, next: any) => {
+        sse.push({ type: 'workspace:mention', ...payload })
+        return next()
+      },
+    })
+    anyCtx.registerMiddleware(`plugin:${plugin.name}:teamworkActivated`, {
+      handler: async (payload: any, next: any) => {
+        sse.push({ type: 'workspace:teamworkActivated', ...payload })
+        return next()
+      },
+    })
+    anyCtx.registerMiddleware(`plugin:${plugin.name}:userJoined`, {
+      handler: async (payload: any, next: any) => {
+        sse.push({ type: 'workspace:participant', sessionId: payload.sessionId, identityId: payload.identityId, action: 'join' })
+        return next()
+      },
+    })
+    anyCtx.registerMiddleware(`plugin:${plugin.name}:handoff`, {
+      handler: async (payload: any, next: any) => {
+        sse.push({ type: 'workspace:handoff', ...payload })
+        return next()
+      },
+    })
+
+    ctx.log.info('@openacp/workspace-plugin ready')
   },
 
-  /**
-   * Called during server shutdown in reverse dependency order.
-   * Clean up resources, close connections, stop timers here.
-   * Has a 10-second timeout.
-   */
   async teardown(): Promise<void> {
-    // Clean up resources here
+    // PresenceTracker timers use unref() so they don't block process exit
   },
 
-  /**
-   * Called when user runs `openacp plugin add @openacp/workspace-plugin`.
-   * Use ctx.terminal for interactive prompts to gather configuration.
-   */
-  async install(ctx: InstallContext): Promise<void> {
-    ctx.terminal.log.info('Installing @openacp/workspace-plugin...')
-
-    // Example: prompt for configuration
-    // const apiKey = await ctx.terminal.text({
-    //   message: 'Enter your API key',
-    //   validate: (v) => v.length === 0 ? 'Required' : undefined,
-    // })
-    // await ctx.settings.set('apiKey', apiKey)
-
-    ctx.terminal.log.success('Installation complete!')
+  async install(ctx): Promise<void> {
+    ctx.terminal.log.success('@openacp/workspace-plugin installed.')
+    ctx.terminal.log.info('Use /teamwork in a session to activate team collaboration mode.')
   },
 
-  /**
-   * Called when user runs `openacp plugin configure @openacp/workspace-plugin`.
-   * Re-run configuration prompts to update settings.
-   */
-  async configure(ctx: InstallContext): Promise<void> {
-    ctx.terminal.log.info('Configuring @openacp/workspace-plugin...')
-
-    // Re-run configuration prompts, pre-filling with current values
-    // const current = await ctx.settings.getAll()
-    // ...
-
-    ctx.terminal.log.success('Configuration updated!')
-  },
-
-  /**
-   * Called during boot when the plugin version has changed.
-   * Migrate settings from the old format to the new format.
-   */
-  async migrate(ctx: MigrateContext, oldSettings: unknown, oldVersion: string): Promise<unknown> {
-    ctx.log.info(`Migrating from v${oldVersion}`)
-    // Return the migrated settings object
-    return oldSettings
-  },
-
-  /**
-   * Called when user runs `openacp plugin remove @openacp/workspace-plugin`.
-   * Clean up any external resources. If opts.purge is true, delete all data.
-   */
-  async uninstall(ctx: InstallContext, opts: { purge: boolean }): Promise<void> {
-    ctx.terminal.log.info('Uninstalling @openacp/workspace-plugin...')
+  async uninstall(ctx, opts): Promise<void> {
     if (opts.purge) {
       await ctx.settings.clear()
+      ctx.terminal.log.info('Plugin data purged.')
     }
-    ctx.terminal.log.success('Uninstalled!')
+    ctx.terminal.log.success('Uninstalled.')
   },
 }
 
