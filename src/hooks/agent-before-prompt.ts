@@ -23,6 +23,8 @@ export function registerAgentBeforePrompt(
       const sender = meta?.[TURN_META_SENDER_KEY] as WorkspaceTurnSender | undefined
       const turnId: string = meta?.turnId ?? 'unknown'
 
+      ctx.log.debug(`workspace: agent:beforePrompt — session=${sessionId} hasMeta=${!!meta} sender=${sender?.displayName ?? 'none'}`)
+
       const store = getSessionStore(sessionId)
       let session = await store.get()
 
@@ -55,6 +57,7 @@ export function registerAgentBeforePrompt(
 
       // --- Teamwork-only behavior below ---
       session = await store.get()
+      ctx.log.debug(`workspace: agent:beforePrompt — type=${session?.type} sysPromptInjected=${session?.systemPromptInjected}`)
       if (session?.type !== 'teamwork') return next()
 
       let userText: string = (payload as any).text
@@ -77,6 +80,7 @@ export function registerAgentBeforePrompt(
       }
 
       ;(payload as any).text = userText
+      ctx.log.info(`workspace: agent:beforePrompt — text modified (len=${userText.length} sysPrompt=${userText.includes('[System:')} prefix=${userText.includes(']: ')})`)
 
       // 3. Notify in-thread for user @mentions and emit hook for SSE
       const mentionedIds = (meta?.[TURN_META_MENTIONS_KEY] as string[]) ?? []

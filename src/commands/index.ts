@@ -13,7 +13,7 @@ export function registerCommands(
   registry: UserRegistry,
   getSessionStore: (sid: string) => SessionStore,
 ): void {
-  ctx.registerCommand(makeTeamworkCommand(getSessionStore, ctx))
+  ctx.registerCommand(makeTeamworkCommand(getSessionStore, ctx, registry))
   ctx.registerCommand(makeWhoamiCommand(registry))
   ctx.registerCommand(makeTeamCommand(getSessionStore, registry))
   ctx.registerCommand(makeAssignCommand(getSessionStore, registry))
