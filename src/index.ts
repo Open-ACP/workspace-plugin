@@ -4,7 +4,7 @@ import { SessionStore } from './session-store.js'
 import { MessageStore } from './message-store.js'
 import { PresenceTracker } from './presence.js'
 import { WorkspaceSseManager } from './api/sse.js'
-import { workspaceRoutes } from './api/routes.js'
+import { workspaceRoutes, type RouteDeps } from './api/routes.js'
 import { registerMessageIncoming } from './hooks/message-incoming.js'
 import { registerAgentBeforePrompt } from './hooks/agent-before-prompt.js'
 import { registerAgentAfterTurn } from './hooks/agent-after-turn.js'
@@ -63,21 +63,29 @@ const plugin: OpenACPPlugin = {
     registerCommands(ctx, registry, getSessionStore)
 
     // Register REST/SSE routes via api-server service (optional dependency).
-    // On hot-reload, Fastify has already booted so registerPlugin throws
-    // AVV_ERR_ROOT_PLG_BOOTED — routes from the first load are still active.
+    // Routes read deps from the shared RouteDeps object on every request.
+    // On hot-reload, ESM cache-busting reimports the module so routeDeps resets.
+    // We store it on globalThis so the same object survives across reloads —
+    // first load registers routes, subsequent loads just swap the dep fields.
+    const depsKey = '__openacp_workspace_route_deps__'
+    const existingDeps = (globalThis as any)[depsKey] as RouteDeps | undefined
     const apiServer = ctx.getService<{ registerPlugin(prefix: string, plugin: any, opts?: { auth?: boolean }): void }>('api-server')
     if (apiServer) {
-      try {
+      if (!existingDeps) {
+        // First load: create deps, register routes once
+        const deps: RouteDeps = { registry, getSessionStore, getMessageStore, sse }
+        ;(globalThis as any)[depsKey] = deps
         apiServer.registerPlugin('/workspace', async (app: any) => {
-          await workspaceRoutes(app, { registry, getSessionStore, getMessageStore, sse })
+          await workspaceRoutes(app, deps)
         }, { auth: true })
         ctx.log.info('Workspace REST API registered at /workspace')
-      } catch (err: any) {
-        if (err?.code === 'AVV_ERR_ROOT_PLG_BOOTED') {
-          ctx.log.debug('Skipping REST route registration — Fastify already booted (hot-reload)')
-        } else {
-          throw err
-        }
+      } else {
+        // Hot-reload: routes still active, swap deps so handlers use fresh instances
+        existingDeps.registry = registry
+        existingDeps.getSessionStore = getSessionStore
+        existingDeps.getMessageStore = getMessageStore
+        existingDeps.sse = sse
+        ctx.log.info('Workspace REST API deps updated (hot-reload)')
       }
     } else {
       ctx.log.warn('api-server service not available — REST/SSE disabled')
