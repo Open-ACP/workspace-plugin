@@ -13,12 +13,21 @@ export function registerMessageIncoming(
   ctx.registerMiddleware('message:incoming', {
     priority: 20,
     handler: async (payload, next) => {
-      const { channelId, userId, text, meta } = payload as any
+      const { channelId, userId, text, meta, userDisplayName, userUsername } = payload as any
 
-      // Build identityId and ensure user record exists
+      // Build identityId and ensure user record exists.
+      // Merge display name and username from the channel adapter if available — this lets
+      // the registry stay current without requiring /whoami for every user.
       const source = (channelId === 'sse' || channelId === 'api') ? 'api' : channelId
       const identityId = UR.buildIdentityId(source, userId)
-      const user = await registry.upsert({ identityId, source })
+      const user = await registry.upsert({
+        identityId,
+        source,
+        // Only include if the adapter provided them — avoids overwriting a manually-set
+        // /whoami name with undefined when the channel doesn't supply display info.
+        ...(userDisplayName !== undefined && { displayName: userDisplayName }),
+        ...(userUsername !== undefined && { username: userUsername }),
+      })
 
       ctx.log.info(`workspace: message:incoming — sender=${identityId} displayName=${user.displayName ?? userId} hasMeta=${!!meta}`)
 
