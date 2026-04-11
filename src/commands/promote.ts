@@ -5,13 +5,13 @@ import { UserRegistry as UR } from '../identity.js'
 import { extractMentions, resolveMentions } from '../mentions.js'
 import type { IdentitySource } from '../types.js'
 
-export function makeHandoffCommand(
+export function makePromoteCommand(
   getSessionStore: (sid: string) => SessionStore,
   registry: UserRegistry,
   ctx: PluginContext,
 ): CommandDef {
   return {
-    name: 'handoff',
+    name: 'promote',
     description: 'Transfer session ownership to another participant',
     usage: '@user',
     category: 'plugin',
@@ -29,7 +29,7 @@ export function makeHandoffCommand(
       }
 
       const mentions = extractMentions(args.raw)
-      if (mentions.length === 0) return { type: 'error', message: 'Usage: /handoff @user' }
+      if (mentions.length === 0) return { type: 'error', message: 'Usage: /promote @user' }
 
       const [newOwnerId] = await resolveMentions(mentions, registry)
       if (!newOwnerId) return { type: 'error', message: `User @${mentions[0]} not found.` }

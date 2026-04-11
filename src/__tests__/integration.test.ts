@@ -13,7 +13,7 @@ describe('@openacp/workspace-plugin integration', () => {
   it('registers all 6 commands on setup', async () => {
     const ctx = makeCtx()
     await plugin.setup(ctx)
-    for (const cmd of ['teamwork', 'whoami', 'team', 'assign', 'tasks', 'handoff']) {
+    for (const cmd of ['teamwork', 'whoami', 'team', 'assign', 'tasks', 'promote']) {
       expect(ctx.registeredCommands.has(cmd), `command /${cmd} missing`).toBe(true)
     }
   })

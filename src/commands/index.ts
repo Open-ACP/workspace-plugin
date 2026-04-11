@@ -6,7 +6,7 @@ import { makeWhoamiCommand } from './whoami.js'
 import { makeTeamCommand } from './team.js'
 import { makeAssignCommand } from './assign.js'
 import { makeTasksCommand } from './tasks.js'
-import { makeHandoffCommand } from './handoff.js'
+import { makePromoteCommand } from './promote.js'
 
 export function registerCommands(
   ctx: PluginContext,
@@ -18,5 +18,5 @@ export function registerCommands(
   ctx.registerCommand(makeTeamCommand(getSessionStore, registry))
   ctx.registerCommand(makeAssignCommand(getSessionStore, registry, ctx))
   ctx.registerCommand(makeTasksCommand(getSessionStore, registry))
-  ctx.registerCommand(makeHandoffCommand(getSessionStore, registry, ctx))
+  ctx.registerCommand(makePromoteCommand(getSessionStore, registry, ctx))
 }

@@ -78,8 +78,9 @@ export function registerAgentBeforePrompt(
           session.participants.map(async p => {
             const user = await registry.getById(p.identityId)
             const name = user?.displayName ?? p.identityId
-            const handle = user?.username ? ` (@${user.username})` : ''
-            return `${name}${handle} [${p.role}]`
+            const handle = user?.username ? ` @${user.username}` : ''
+            // Include identityId so the agent can uniquely identify users with the same display name
+            return `${name}${handle} (id:${p.identityId}, ${p.role})`
           })
         )).join(', ')
         userText = `${TEAM_SYSTEM_PROMPT(participantNames)}\n\n${userText}`
