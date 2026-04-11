@@ -13,18 +13,22 @@ export function registerMessageIncoming(
   ctx.registerMiddleware('message:incoming', {
     priority: 20,
     handler: async (payload, next) => {
-      const { channelId, userId, text, meta, userDisplayName, userUsername } = payload as any
+      const { channelId, userId, text, meta } = payload as any
+
+      // Adapters may inject display name / username into TurnMeta (via handleMessage initialMeta)
+      // so plugins don't need adapter-specific fields on IncomingMessage.
+      const userDisplayName = meta?.userDisplayName as string | undefined
+      const userUsername = meta?.userUsername as string | undefined
 
       // Build identityId and ensure user record exists.
-      // Merge display name and username from the channel adapter if available — this lets
+      // Merge display name and username when the adapter provided them — this lets
       // the registry stay current without requiring /whoami for every user.
+      // Only include defined values to avoid overwriting a manually-set /whoami name.
       const source = (channelId === 'sse' || channelId === 'api') ? 'api' : channelId
       const identityId = UR.buildIdentityId(source, userId)
       const user = await registry.upsert({
         identityId,
         source,
-        // Only include if the adapter provided them — avoids overwriting a manually-set
-        // /whoami name with undefined when the channel doesn't supply display info.
         ...(userDisplayName !== undefined && { displayName: userDisplayName }),
         ...(userUsername !== undefined && { username: userUsername }),
       })
