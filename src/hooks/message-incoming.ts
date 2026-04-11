@@ -3,7 +3,7 @@ import type { UserRegistry } from '../identity.js'
 import type { PresenceTracker } from '../presence.js'
 import { UserRegistry as UR } from '../identity.js'
 import { extractMentions, resolveMentions } from '../mentions.js'
-import { TURN_META_SENDER_KEY, TURN_META_MENTIONS_KEY } from '../types.js'
+import { TURN_META_CHANNEL_USER_KEY, TURN_META_SENDER_KEY, TURN_META_MENTIONS_KEY, type ChannelUserMeta } from '../types.js'
 
 export function registerMessageIncoming(
   ctx: PluginContext,
@@ -15,22 +15,22 @@ export function registerMessageIncoming(
     handler: async (payload, next) => {
       const { channelId, userId, text, meta } = payload as any
 
-      // Adapters may inject display name / username into TurnMeta (via handleMessage initialMeta)
-      // so plugins don't need adapter-specific fields on IncomingMessage.
-      const userDisplayName = meta?.userDisplayName as string | undefined
-      const userUsername = meta?.userUsername as string | undefined
+      // Adapters inject a structured ChannelUserMeta into TurnMeta via handleMessage(initialMeta).
+      // Fall back to the raw message fields so the hook works even without adapter enrichment.
+      const channelUser = meta?.[TURN_META_CHANNEL_USER_KEY] as ChannelUserMeta | undefined
+      const effectiveChannelId = channelUser?.channelId ?? channelId
+      const effectiveUserId = channelUser?.userId ?? userId
 
       // Build identityId and ensure user record exists.
-      // Merge display name and username when the adapter provided them — this lets
-      // the registry stay current without requiring /whoami for every user.
-      // Only include defined values to avoid overwriting a manually-set /whoami name.
-      const source = (channelId === 'sse' || channelId === 'api') ? 'api' : channelId
-      const identityId = UR.buildIdentityId(source, userId)
+      // Only merge display name/username when provided — avoids overwriting a manually-set
+      // /whoami name with undefined when the adapter doesn't supply display info.
+      const source = (effectiveChannelId === 'sse' || effectiveChannelId === 'api') ? 'api' : effectiveChannelId
+      const identityId = UR.buildIdentityId(source, effectiveUserId)
       const user = await registry.upsert({
         identityId,
         source,
-        ...(userDisplayName !== undefined && { displayName: userDisplayName }),
-        ...(userUsername !== undefined && { username: userUsername }),
+        ...(channelUser?.displayName !== undefined && { displayName: channelUser.displayName }),
+        ...(channelUser?.username !== undefined && { username: channelUser.username }),
       })
 
       ctx.log.info(`workspace: message:incoming — sender=${identityId} displayName=${user.displayName ?? userId} hasMeta=${!!meta}`)

@@ -56,13 +56,33 @@ export interface MessageRecord {
   timestamp: string
 }
 
-/** Sender info written to TurnMeta by this plugin. */
+/**
+ * Channel user info injected into TurnMeta by the channel adapter via handleMessage(initialMeta).
+ * Any adapter can populate this so plugins can identify who sent the message without
+ * needing adapter-specific fields on IncomingMessage.
+ */
+export interface ChannelUserMeta {
+  /** The channel adapter this message came from (telegram, discord, slack, api, sse). */
+  channelId: string
+  /** Raw user ID as provided by the channel. */
+  userId: string
+  /** Human-readable display name (e.g. Telegram first+last name, Discord display name). */
+  displayName?: string
+  /** Channel handle without prefix (e.g. Telegram @handle, Discord username#tag). */
+  username?: string
+  /** Extra adapter-specific fields for forward compatibility. */
+  [key: string]: unknown
+}
+
+/** Sender info written to TurnMeta by this plugin after resolving against the registry. */
 export interface WorkspaceTurnSender {
   identityId: string
   displayName: string
   username?: string
 }
 
+/** Well-known TurnMeta key for channel adapter user info (set by adapters, read by plugins). */
+export const TURN_META_CHANNEL_USER_KEY = 'channelUser'
 export const TURN_META_SENDER_KEY = 'workspace.sender'
 export const TURN_META_MENTIONS_KEY = 'workspace.mentions'
 
