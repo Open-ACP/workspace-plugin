@@ -16,7 +16,7 @@ export function registerCommands(
   ctx.registerCommand(makeTeamworkCommand(getSessionStore, ctx, registry))
   ctx.registerCommand(makeWhoamiCommand(registry))
   ctx.registerCommand(makeTeamCommand(getSessionStore, registry))
-  ctx.registerCommand(makeAssignCommand(getSessionStore, registry))
+  ctx.registerCommand(makeAssignCommand(getSessionStore, registry, ctx))
   ctx.registerCommand(makeTasksCommand(getSessionStore, registry))
-  ctx.registerCommand(makeHandoffCommand(getSessionStore, registry))
+  ctx.registerCommand(makeHandoffCommand(getSessionStore, registry, ctx))
 }

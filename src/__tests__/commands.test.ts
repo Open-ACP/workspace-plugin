@@ -5,6 +5,8 @@ import { SessionStore } from '../session-store.js'
 import { makeTeamworkCommand } from '../commands/teamwork.js'
 import { makeWhoamiCommand } from '../commands/whoami.js'
 import { makeTeamCommand } from '../commands/team.js'
+import { makeAssignCommand } from '../commands/assign.js'
+import { makeHandoffCommand } from '../commands/handoff.js'
 
 function setup(sessionId = 'sess-1') {
   const ctx = createTestContext({
@@ -81,5 +83,92 @@ describe('/team command', () => {
     const result = await cmd.handler({ raw: '', sessionId: 'sess-1', channelId: 'telegram', userId: '123', reply: async () => {} })
     expect((result as any).text).toContain('Lucas')
     expect((result as any).text).toContain('owner')
+  })
+})
+
+describe('/assign command', () => {
+  it('assigns task to a participant', async () => {
+    const { ctx, getStore, registry } = setup()
+    await registry.upsert({ identityId: 'telegram:123', source: 'telegram', displayName: 'Alice', username: 'alice' })
+    await registry.upsert({ identityId: 'telegram:456', source: 'telegram', displayName: 'Bob', username: 'bob' })
+    const store = getStore('sess-1')
+    await store.init('telegram:123')
+    await store.activateTeamwork()
+    await store.addParticipant('telegram:456')
+    const cmd = makeAssignCommand(getStore, registry, ctx)
+    const result = await cmd.handler({ raw: '@bob Fix the bug', sessionId: 'sess-1', channelId: 'telegram', userId: '123', reply: async () => {} })
+    expect(result).toMatchObject({ type: 'text' })
+    expect((result as any).text).toContain('Bob')
+    const session = await store.get()
+    expect(session?.tasks).toHaveLength(1)
+    expect(session?.tasks[0].assignee).toBe('telegram:456')
+  })
+
+  it('rejects assignment to non-participant', async () => {
+    const { ctx, getStore, registry } = setup()
+    await registry.upsert({ identityId: 'telegram:123', source: 'telegram', displayName: 'Alice', username: 'alice' })
+    await registry.upsert({ identityId: 'telegram:999', source: 'telegram', displayName: 'Stranger', username: 'stranger' })
+    const store = getStore('sess-1')
+    await store.init('telegram:123')
+    await store.activateTeamwork()
+    const cmd = makeAssignCommand(getStore, registry, ctx)
+    const result = await cmd.handler({ raw: '@stranger Do something', sessionId: 'sess-1', channelId: 'telegram', userId: '123', reply: async () => {} })
+    expect(result).toMatchObject({ type: 'error' })
+    expect((result as any).message).toContain('not a participant')
+  })
+
+  it('requires teamwork mode', async () => {
+    const { ctx, getStore, registry } = setup()
+    await getStore('sess-1').init('telegram:123')
+    const cmd = makeAssignCommand(getStore, registry, ctx)
+    const result = await cmd.handler({ raw: '@alice task', sessionId: 'sess-1', channelId: 'telegram', userId: '123', reply: async () => {} })
+    expect(result).toMatchObject({ type: 'error' })
+    expect((result as any).message).toContain('team mode')
+  })
+})
+
+describe('/handoff command', () => {
+  it('transfers ownership to a participant', async () => {
+    const { ctx, getStore, registry } = setup()
+    await registry.upsert({ identityId: 'telegram:123', source: 'telegram', displayName: 'Alice', username: 'alice' })
+    await registry.upsert({ identityId: 'telegram:456', source: 'telegram', displayName: 'Bob', username: 'bob' })
+    const store = getStore('sess-1')
+    await store.init('telegram:123')
+    await store.activateTeamwork()
+    await store.addParticipant('telegram:456')
+    const cmd = makeHandoffCommand(getStore, registry, ctx)
+    const result = await cmd.handler({ raw: '@bob', sessionId: 'sess-1', channelId: 'telegram', userId: '123', reply: async () => {} })
+    expect(result).toMatchObject({ type: 'text' })
+    expect((result as any).text).toContain('Bob')
+    const session = await store.get()
+    expect(session?.owner).toBe('telegram:456')
+  })
+
+  it('rejects handoff by non-owner', async () => {
+    const { ctx, getStore, registry } = setup()
+    await registry.upsert({ identityId: 'telegram:123', source: 'telegram', displayName: 'Alice', username: 'alice' })
+    await registry.upsert({ identityId: 'telegram:456', source: 'telegram', displayName: 'Bob', username: 'bob' })
+    const store = getStore('sess-1')
+    await store.init('telegram:123')
+    await store.activateTeamwork()
+    await store.addParticipant('telegram:456')
+    const cmd = makeHandoffCommand(getStore, registry, ctx)
+    // Bob (456) tries to handoff, but Alice (123) is the owner
+    const result = await cmd.handler({ raw: '@alice', sessionId: 'sess-1', channelId: 'telegram', userId: '456', reply: async () => {} })
+    expect(result).toMatchObject({ type: 'error' })
+    expect((result as any).message).toContain('owner')
+  })
+
+  it('rejects handoff to non-participant', async () => {
+    const { ctx, getStore, registry } = setup()
+    await registry.upsert({ identityId: 'telegram:123', source: 'telegram', displayName: 'Alice', username: 'alice' })
+    await registry.upsert({ identityId: 'telegram:999', source: 'telegram', displayName: 'Stranger', username: 'stranger' })
+    const store = getStore('sess-1')
+    await store.init('telegram:123')
+    await store.activateTeamwork()
+    const cmd = makeHandoffCommand(getStore, registry, ctx)
+    const result = await cmd.handler({ raw: '@stranger', sessionId: 'sess-1', channelId: 'telegram', userId: '123', reply: async () => {} })
+    expect(result).toMatchObject({ type: 'error' })
+    expect((result as any).message).toContain('not a participant')
   })
 })

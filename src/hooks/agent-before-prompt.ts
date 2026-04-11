@@ -70,11 +70,18 @@ export function registerAgentBeforePrompt(
         userText = `[${name}]: ${userText}`
       }
 
-      // 2. Inject team system prompt BEFORE the prefixed text (on first turn after activation)
+      // 2. Inject team system prompt BEFORE the prefixed text (on first turn after activation).
+      // Resolve display names from registry so the agent sees human names, not raw identityIds.
+      // Also include the @username handle so the agent can form valid @mentions.
       if (!session.systemPromptInjected && sender) {
-        const participantNames = session.participants
-          .map(p => `${p.identityId} (${p.role})`)
-          .join(', ')
+        const participantNames = (await Promise.all(
+          session.participants.map(async p => {
+            const user = await registry.getById(p.identityId)
+            const name = user?.displayName ?? p.identityId
+            const handle = user?.username ? ` (@${user.username})` : ''
+            return `${name}${handle} [${p.role}]`
+          })
+        )).join(', ')
         userText = `${TEAM_SYSTEM_PROMPT(participantNames)}\n\n${userText}`
         await store.markSystemPromptInjected()
       }

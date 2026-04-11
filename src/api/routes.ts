@@ -54,7 +54,20 @@ export async function workspaceRoutes(
     const user = (req as any).user as { sub: string } | undefined
     if (!user?.sub) return reply.status(401).send({ error: 'Unauthorized' })
     const { displayName, username } = req.body as { displayName?: string; username?: string }
-    await deps.registry.upsert({ identityId: `api:${user.sub}`, source: 'api', displayName, username })
+    if (displayName !== undefined && (typeof displayName !== 'string' || !displayName.trim())) {
+      return reply.status(400).send({ error: 'displayName must be a non-empty string' })
+    }
+    // Username must match the @mention pattern to be resolvable
+    if (username !== undefined && (typeof username !== 'string' || !/^[a-zA-Z0-9_.-]+$/.test(username))) {
+      return reply.status(400).send({ error: 'username must contain only letters, numbers, _ . -' })
+    }
+    // Only include defined fields — avoids overwriting an existing name with undefined
+    await deps.registry.upsert({
+      identityId: `api:${user.sub}`,
+      source: 'api',
+      ...(displayName !== undefined && { displayName: displayName.trim() }),
+      ...(username !== undefined && { username }),
+    })
     return { ok: true }
   })
 
