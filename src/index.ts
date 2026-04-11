@@ -62,13 +62,23 @@ const plugin: OpenACPPlugin = {
     // Register chat commands
     registerCommands(ctx, registry, getSessionStore)
 
-    // Register REST/SSE routes via api-server service (optional dependency)
+    // Register REST/SSE routes via api-server service (optional dependency).
+    // On hot-reload, Fastify has already booted so registerPlugin throws
+    // AVV_ERR_ROOT_PLG_BOOTED — routes from the first load are still active.
     const apiServer = ctx.getService<{ registerPlugin(prefix: string, plugin: any, opts?: { auth?: boolean }): void }>('api-server')
     if (apiServer) {
-      apiServer.registerPlugin('/workspace', async (app: any) => {
-        await workspaceRoutes(app, { registry, getSessionStore, getMessageStore, sse })
-      }, { auth: true })
-      ctx.log.info('Workspace REST API registered at /workspace')
+      try {
+        apiServer.registerPlugin('/workspace', async (app: any) => {
+          await workspaceRoutes(app, { registry, getSessionStore, getMessageStore, sse })
+        }, { auth: true })
+        ctx.log.info('Workspace REST API registered at /workspace')
+      } catch (err: any) {
+        if (err?.code === 'AVV_ERR_ROOT_PLG_BOOTED') {
+          ctx.log.debug('Skipping REST route registration — Fastify already booted (hot-reload)')
+        } else {
+          throw err
+        }
+      }
     } else {
       ctx.log.warn('api-server service not available — REST/SSE disabled')
     }
