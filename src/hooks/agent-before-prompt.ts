@@ -9,6 +9,9 @@ const TEAM_SYSTEM_PROMPT = (participants: string) =>
   `[System: Team session. ${participants}. Each message is prefixed with [Name]. ` +
   `You can @mention participants — they will be notified and can take action or make decisions.]`
 
+// EventBus is typed loosely in the plugin-sdk; narrow it here for safe emit calls.
+type EventEmitter = { emit(event: string, data: unknown): void }
+
 export function registerAgentBeforePrompt(
   ctx: PluginContext,
   registry: UserRegistry,
@@ -16,6 +19,7 @@ export function registerAgentBeforePrompt(
   getMessageStore: (sessionId: string) => MessageStore,
   presence: PresenceTracker,
 ): void {
+  const eventBus = ctx.eventBus as unknown as EventEmitter
   ctx.registerMiddleware('agent:beforePrompt', {
     priority: 20,
     handler: async (payload, next) => {
@@ -60,6 +64,19 @@ export function registerAgentBeforePrompt(
       ctx.log.info(`workspace: agent:beforePrompt — type=${session?.type} sysPromptInjected=${session?.systemPromptInjected}`)
       if (session?.type !== 'teamwork') return next()
 
+      // Require a username before participating in team sessions.
+      // This ensures every participant can be @mentioned and identified unambiguously.
+      // Adapters that supply a username (e.g. Telegram with @handle) pass automatically.
+      if (!sender?.username) {
+        const errorText = '⚠️ Team mode requires a username so others can @mention you.\n\nRun /whoami to set up your profile:\n/whoami @username [Display Name]\n\nExample: /whoami @alice Alice Nguyen'
+        // Emit the error as agent events so SSE clients clear their streaming/thinking state.
+        // ctx.sendMessage is a no-op (message-router unregistered), so we emit to eventBus
+        // directly. The text event shows the error; usage signals turn-end to the app.
+        eventBus.emit('agent:event', { sessionId, event: { type: 'text', content: errorText } })
+        eventBus.emit('agent:event', { sessionId, event: { type: 'usage' } })
+        return null
+      }
+
       let userText: string = (payload as any).text
 
       // 1. Prefix sender name on the user's text
@@ -94,10 +111,8 @@ export function registerAgentBeforePrompt(
       const mentionedIds = (meta?.[TURN_META_MENTIONS_KEY] as string[]) ?? []
       for (const mentionedId of mentionedIds) {
         const mentionedUser = await registry.getById(mentionedId)
-        await ctx.sendMessage(sessionId, {
-          type: 'text' as const,
-          text: `📢 ${sender?.displayName ?? 'Someone'} mentioned @${mentionedUser?.username ?? mentionedId} in this session.`,
-        })
+        // TODO: deliver mention notifications via a proper channel once message-router is wired up
+        void mentionedUser
         await ctx.emitHook('mention', {
           sessionId,
           turnId,

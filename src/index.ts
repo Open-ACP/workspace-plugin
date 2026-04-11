@@ -25,6 +25,7 @@ const plugin: OpenACPPlugin = {
     'storage:write',
     'services:use',
     'sessions:read',
+    'kernel:access',
   ],
 
   async setup(ctx: PluginContext): Promise<void> {
