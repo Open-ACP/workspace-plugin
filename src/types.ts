@@ -93,4 +93,4 @@ export type SseEvent =
   | { type: 'workspace:presence'; sessionId: string; identityId: string; status: ParticipantStatus }
   | { type: 'workspace:task:assigned'; sessionId: string; taskId: string; assignee: string; title: string }
   | { type: 'workspace:task:done'; sessionId: string; taskId: string }
-  | { type: 'workspace:handoff'; sessionId: string; from: string; to: string }
+  | { type: 'workspace:promote'; sessionId: string; from: string; to: string }

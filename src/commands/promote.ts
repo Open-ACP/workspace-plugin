@@ -45,7 +45,7 @@ export function makePromoteCommand(
       const user = await registry.getById(newOwnerId)
       const name = user?.displayName ?? newOwnerId
 
-      await ctx.emitHook('handoff', { sessionId: args.sessionId, from: callerId, to: newOwnerId })
+      await ctx.emitHook('promote', { sessionId: args.sessionId, from: callerId, to: newOwnerId })
 
       return { type: 'text', text: `✅ Session ownership transferred to ${name}.` }
     },

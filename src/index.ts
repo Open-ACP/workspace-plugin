@@ -56,7 +56,7 @@ const plugin: OpenACPPlugin = {
     ctx.defineHook('userJoined')
     ctx.defineHook('userLeft')
     ctx.defineHook('taskAssigned')
-    ctx.defineHook('handoff')
+    ctx.defineHook('promote')
     ctx.defineHook('mention')
 
     // Register chat commands
@@ -97,9 +97,9 @@ const plugin: OpenACPPlugin = {
         return next()
       },
     })
-    anyCtx.registerMiddleware(`plugin:${plugin.name}:handoff`, {
+    anyCtx.registerMiddleware(`plugin:${plugin.name}:promote`, {
       handler: async (payload: any, next: any) => {
-        sse.push({ type: 'workspace:handoff', ...payload })
+        sse.push({ type: 'workspace:promote', ...payload })
         return next()
       },
     })
