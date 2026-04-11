@@ -4,7 +4,7 @@ import { SessionStore } from './session-store.js'
 import { MessageStore } from './message-store.js'
 import { PresenceTracker } from './presence.js'
 import { WorkspaceSseManager } from './api/sse.js'
-import { workspaceRoutes, type RouteDeps } from './api/routes.js'
+import { workspaceRoutes } from './api/routes.js'
 import { registerMessageIncoming } from './hooks/message-incoming.js'
 import { registerAgentBeforePrompt } from './hooks/agent-before-prompt.js'
 import { registerAgentAfterTurn } from './hooks/agent-after-turn.js'
@@ -63,30 +63,14 @@ const plugin: OpenACPPlugin = {
     registerCommands(ctx, registry, getSessionStore)
 
     // Register REST/SSE routes via api-server service (optional dependency).
-    // Routes read deps from the shared RouteDeps object on every request.
-    // On hot-reload, ESM cache-busting reimports the module so routeDeps resets.
-    // We store it on globalThis so the same object survives across reloads —
-    // first load registers routes, subsequent loads just swap the dep fields.
-    const depsKey = '__openacp_workspace_route_deps__'
-    const existingDeps = (globalThis as any)[depsKey] as RouteDeps | undefined
+    // On hot-reload, core's registerPlugin skips duplicate prefixes — routes
+    // from the first load remain active and still work (same storage path).
     const apiServer = ctx.getService<{ registerPlugin(prefix: string, plugin: any, opts?: { auth?: boolean }): void }>('api-server')
     if (apiServer) {
-      if (!existingDeps) {
-        // First load: create deps, register routes once
-        const deps: RouteDeps = { registry, getSessionStore, getMessageStore, sse }
-        ;(globalThis as any)[depsKey] = deps
-        apiServer.registerPlugin('/workspace', async (app: any) => {
-          await workspaceRoutes(app, deps)
-        }, { auth: true })
-        ctx.log.info('Workspace REST API registered at /workspace')
-      } else {
-        // Hot-reload: routes still active, swap deps so handlers use fresh instances
-        existingDeps.registry = registry
-        existingDeps.getSessionStore = getSessionStore
-        existingDeps.getMessageStore = getMessageStore
-        existingDeps.sse = sse
-        ctx.log.info('Workspace REST API deps updated (hot-reload)')
-      }
+      apiServer.registerPlugin('/workspace', async (app: any) => {
+        await workspaceRoutes(app, { registry, getSessionStore, getMessageStore, sse })
+      }, { auth: true })
+      ctx.log.info('Workspace REST API registered at /workspace')
     } else {
       ctx.log.warn('api-server service not available — REST/SSE disabled')
     }
