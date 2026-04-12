@@ -6,13 +6,13 @@ const IDLE_TIMEOUT_MS = 30 * 60 * 1000
 export class PresenceTracker {
   private idleTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-  markActive(sessionStore: SessionStore, sessionId: string, identityId: string): void {
-    const key = `${sessionId}:${identityId}`
+  markActive(sessionStore: SessionStore, sessionId: string, userId: string): void {
+    const key = `${sessionId}:${userId}`
     const existing = this.idleTimers.get(key)
     if (existing) clearTimeout(existing)
 
     const timer = setTimeout(async () => {
-      await sessionStore.updatePresence(identityId, 'idle')
+      await sessionStore.updatePresence(userId, 'idle')
       this.idleTimers.delete(key)
     }, IDLE_TIMEOUT_MS)
     // Allow process to exit even if timer is pending

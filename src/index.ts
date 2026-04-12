@@ -1,11 +1,10 @@
 import type { OpenACPPlugin, PluginContext } from '@openacp/plugin-sdk'
-import { UserRegistry } from './identity.js'
+import type { IdentityService } from './types.js'
 import { SessionStore } from './session-store.js'
 import { MessageStore } from './message-store.js'
 import { PresenceTracker } from './presence.js'
 import { WorkspaceSseManager } from './api/sse.js'
 import { workspaceRoutes } from './api/routes.js'
-import { registerMessageIncoming } from './hooks/message-incoming.js'
 import { registerAgentBeforePrompt } from './hooks/agent-before-prompt.js'
 import { registerAgentAfterTurn } from './hooks/agent-after-turn.js'
 import { registerTurnLifecycle } from './hooks/turn-lifecycle.js'
@@ -14,8 +13,12 @@ import { registerCommands } from './commands/index.js'
 
 const plugin: OpenACPPlugin = {
   name: '@openacp/workspace-plugin',
-  version: '0.1.0',
+  version: '0.2.0',
   description: 'Multi-user collaboration for shared OpenACP sessions',
+
+  pluginDependencies: {
+    '@openacp/identity': '>=0.1.0',
+  },
 
   permissions: [
     'events:read',
@@ -26,11 +29,20 @@ const plugin: OpenACPPlugin = {
     'services:use',
     'sessions:read',
     'kernel:access',
+    // These permissions are defined in the identity-notifications worktree (not yet merged).
+    // Cast as any until plugin-sdk is republished with the new permission types.
+    'identity:read' as any,
+    'identity:write' as any,
+    'notifications:send' as any,
   ],
 
   async setup(ctx: PluginContext): Promise<void> {
-    // Core data modules
-    const registry = new UserRegistry(ctx.storage)
+    // Get core identity service (required dependency — must be available)
+    const identity = ctx.getService<IdentityService>('identity')
+    if (!identity) {
+      throw new Error('@openacp/identity service not available — workspace-plugin requires it')
+    }
+
     const presence = new PresenceTracker()
     const sse = new WorkspaceSseManager()
 
@@ -46,9 +58,9 @@ const plugin: OpenACPPlugin = {
     }
 
     // Register middleware hooks
-    registerMessageIncoming(ctx, registry, presence)
-    registerAgentBeforePrompt(ctx, registry, getSessionStore, getMessageStore, presence)
-    registerAgentAfterTurn(ctx, registry, isTeamwork)
+    // Note: message:incoming is handled by core identity plugin (auto-registration at priority 110)
+    registerAgentBeforePrompt(ctx, identity, getSessionStore, getMessageStore, presence)
+    registerAgentAfterTurn(ctx, identity, isTeamwork)
     registerTurnLifecycle(ctx, getSessionStore, presence)
     registerSessionDestroy(ctx, getSessionStorage)
 
@@ -61,24 +73,20 @@ const plugin: OpenACPPlugin = {
     ctx.defineHook('mention')
 
     // Register chat commands
-    registerCommands(ctx, registry, getSessionStore)
+    registerCommands(ctx, identity, getSessionStore)
 
     // Register REST/SSE routes via api-server service (optional dependency).
-    // On hot-reload, core's registerPlugin skips duplicate prefixes — routes
-    // from the first load remain active and still work (same storage path).
     const apiServer = ctx.getService<{ registerPlugin(prefix: string, plugin: any, opts?: { auth?: boolean }): void }>('api-server')
     if (apiServer) {
       apiServer.registerPlugin('/workspace', async (app: any) => {
-        await workspaceRoutes(app, { registry, getSessionStore, getMessageStore, sse })
+        await workspaceRoutes(app, { identity, getSessionStore, getMessageStore, sse })
       }, { auth: true })
       ctx.log.info('Workspace REST API registered at /workspace')
     } else {
       ctx.log.warn('api-server service not available — REST/SSE disabled')
     }
 
-    // Wire SSE event push by observing plugin hooks via middleware on the full qualified name.
-    // emitHook fires through the middleware chain (not EventBus), so we use registerMiddleware
-    // with the fully-qualified hook name to observe without modifying the payload.
+    // Wire SSE event push by observing plugin hooks via middleware.
     const anyCtx = ctx as any
     anyCtx.registerMiddleware(`plugin:${plugin.name}:mention`, {
       handler: async (payload: any, next: any) => {
@@ -94,7 +102,7 @@ const plugin: OpenACPPlugin = {
     })
     anyCtx.registerMiddleware(`plugin:${plugin.name}:userJoined`, {
       handler: async (payload: any, next: any) => {
-        sse.push({ type: 'workspace:participant', sessionId: payload.sessionId, identityId: payload.identityId, action: 'join' })
+        sse.push({ type: 'workspace:participant', sessionId: payload.sessionId, userId: payload.userId, action: 'join' })
         return next()
       },
     })

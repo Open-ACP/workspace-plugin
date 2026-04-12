@@ -1,27 +1,64 @@
 // All workspace plugin data types.
 // Storage key conventions:
-//   Global: users/{identityId}, usernames/{username}
 //   Session-scoped: session, messages/{turnId}
 
-export type IdentitySource = 'api' | 'telegram' | 'discord' | 'slack'
+// ---------------------------------------------------------------------------
+// Identity — minimal interface for core IdentityService consumption
+// ---------------------------------------------------------------------------
 
-export interface UserRecord {
-  /** Format: "{source}:{id}" — e.g. "telegram:123456789", "api:abc123xyz" */
-  identityId: string
-  source: IdentitySource
-  displayName?: string
-  /** Used for @mention resolution. Unique within the plugin's user registry. */
-  username?: string
-  linkedIdentities?: string[]
-  registeredAt: string
-  updatedAt: string
+/**
+ * Subset of core IdentityService that workspace-plugin actually uses.
+ * Defined locally to avoid compile-time dependency on the identity plugin.
+ * Consumers get the real service via ctx.getService<IdentityService>('identity').
+ */
+export interface IdentityService {
+  getUser(userId: string): Promise<IdentityUser | undefined>
+  getUserByUsername(username: string): Promise<IdentityUser | undefined>
+  getUserByIdentity(identityId: string): Promise<IdentityUser | undefined>
+  updateUser(
+    userId: string,
+    changes: Partial<Pick<IdentityUser, 'displayName' | 'username'>>,
+  ): Promise<IdentityUser>
 }
+
+/** Builds an IdentityId string from channelId + platform userId (same format as core). */
+export function formatIdentityId(channelId: string, platformUserId: string): string {
+  const source = (channelId === 'sse' || channelId === 'api') ? 'api' : channelId
+  return `${source}:${platformUserId}`
+}
+
+/** Core UserRecord shape — only the fields workspace-plugin reads. */
+export interface IdentityUser {
+  userId: string
+  displayName: string
+  username?: string
+  role: string
+}
+
+/**
+ * Identity snapshot injected into TurnMeta by core's auto-register middleware.
+ * Available as meta.identity in agent:beforePrompt, turn:start, etc.
+ */
+export interface IdentitySnapshot {
+  userId: string
+  identityId: string
+  displayName: string
+  username?: string
+  role: string
+}
+
+/** Well-known TurnMeta key for resolved mentions (userId[]). */
+export const TURN_META_MENTIONS_KEY = 'workspace.mentions'
+
+// ---------------------------------------------------------------------------
+// Session & Participants
+// ---------------------------------------------------------------------------
 
 export type ParticipantStatus = 'active' | 'idle' | 'offline'
 export type ParticipantRole = 'owner' | 'member'
 
 export interface ParticipantRecord {
-  identityId: string
+  userId: string
   role: ParticipantRole
   joinedAt: string
   status: ParticipantStatus
@@ -31,7 +68,7 @@ export interface ParticipantRecord {
 export interface TaskRecord {
   id: string
   title: string
-  assignee?: string  // identityId
+  assignee?: string  // userId
   status: 'open' | 'done'
   createdAt: string
 }
@@ -39,7 +76,7 @@ export interface TaskRecord {
 export interface SessionRecord {
   sessionId: string
   type: 'solo' | 'teamwork'
-  owner: string  // identityId
+  owner: string  // userId
   participants: ParticipantRecord[]
   tasks: TaskRecord[]
   /** Whether the team system prompt has been injected for this session. */
@@ -49,48 +86,22 @@ export interface SessionRecord {
 
 export interface MessageRecord {
   turnId: string
-  identityId: string
+  userId: string
   /** Original text before [Name]: prefix was added. */
   text: string
-  mentions: string[]  // identityIds
+  mentions: string[]  // userId[]
   timestamp: string
 }
 
-/**
- * Channel user info injected into TurnMeta by the channel adapter via handleMessage(initialMeta).
- * Any adapter can populate this so plugins can identify who sent the message without
- * needing adapter-specific fields on IncomingMessage.
- */
-export interface ChannelUserMeta {
-  /** The channel adapter this message came from (telegram, discord, slack, api, sse). */
-  channelId: string
-  /** Raw user ID as provided by the channel. */
-  userId: string
-  /** Human-readable display name (e.g. Telegram first+last name, Discord display name). */
-  displayName?: string
-  /** Channel handle without prefix (e.g. Telegram @handle, Discord username#tag). */
-  username?: string
-  /** Extra adapter-specific fields for forward compatibility. */
-  [key: string]: unknown
-}
-
-/** Sender info written to TurnMeta by this plugin after resolving against the registry. */
-export interface WorkspaceTurnSender {
-  identityId: string
-  displayName: string
-  username?: string
-}
-
-/** Well-known TurnMeta key for channel adapter user info (set by adapters, read by plugins). */
-export const TURN_META_CHANNEL_USER_KEY = 'channelUser'
-export const TURN_META_SENDER_KEY = 'workspace.sender'
-export const TURN_META_MENTIONS_KEY = 'workspace.mentions'
+// ---------------------------------------------------------------------------
+// SSE Events
+// ---------------------------------------------------------------------------
 
 export type SseEvent =
   | { type: 'workspace:teamworkActivated'; sessionId: string }
   | { type: 'workspace:mention'; sessionId: string; mentionedBy: string; mentionedUser: string; turnId: string }
-  | { type: 'workspace:participant'; sessionId: string; identityId: string; action: 'join' | 'leave' }
-  | { type: 'workspace:presence'; sessionId: string; identityId: string; status: ParticipantStatus }
+  | { type: 'workspace:participant'; sessionId: string; userId: string; action: 'join' | 'leave' }
+  | { type: 'workspace:presence'; sessionId: string; userId: string; status: ParticipantStatus }
   | { type: 'workspace:task:assigned'; sessionId: string; taskId: string; assignee: string; title: string }
   | { type: 'workspace:task:done'; sessionId: string; taskId: string }
   | { type: 'workspace:promote'; sessionId: string; from: string; to: string }

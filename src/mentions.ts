@@ -1,4 +1,4 @@
-import type { UserRegistry } from './identity.js'
+import type { IdentityService } from './types.js'
 
 const MENTION_REGEX = /@([a-zA-Z0-9_.-]+)/g
 
@@ -11,13 +11,16 @@ export function extractMentions(text: string): string[] {
   return [...matches]
 }
 
-/** Resolves mention usernames to identityIds. Unknown usernames are silently skipped. */
+/** Resolves mention usernames to userIds via IdentityService. Unknown usernames are silently skipped. */
 export async function resolveMentions(
   usernames: string[],
-  registry: UserRegistry,
+  identity: IdentityService,
 ): Promise<string[]> {
   const results = await Promise.all(
-    usernames.map(u => registry.resolveUsername(u)),
+    usernames.map(async u => {
+      const user = await identity.getUserByUsername(u)
+      return user?.userId
+    }),
   )
   return results.filter((id): id is string => id !== undefined)
 }

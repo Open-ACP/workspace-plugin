@@ -1,10 +1,10 @@
 import type { PluginContext } from '@openacp/plugin-sdk'
-import type { UserRegistry } from '../identity.js'
+import type { IdentityService } from '../types.js'
 import { extractMentions, resolveMentions } from '../mentions.js'
 
 export function registerAgentAfterTurn(
   ctx: PluginContext,
-  registry: UserRegistry,
+  identity: IdentityService,
   isTeamworkSession: (sessionId: string) => Promise<boolean>,
 ): void {
   ctx.registerMiddleware('agent:afterTurn', {
@@ -15,18 +15,20 @@ export function registerAgentAfterTurn(
       const usernames = extractMentions(fullText)
       if (usernames.length === 0) return next()
 
-      const mentionedIds = await resolveMentions(usernames, registry)
-      for (const mentionedId of mentionedIds) {
-        const user = await registry.getById(mentionedId)
-        await ctx.sendMessage(sessionId, {
-          type: 'text' as const,
-          text: `🤖 The agent mentioned @${user?.username ?? mentionedId}. Your input may be needed.`,
-        })
+      const mentionedUserIds = await resolveMentions(usernames, identity)
+      const notify = (ctx as any).notify?.bind(ctx) as ((t: any, m: any, o?: any) => void) | undefined
+      for (const mentionedUserId of mentionedUserIds) {
+        const user = await identity.getUser(mentionedUserId)
+        notify?.(
+          { userId: mentionedUserId },
+          { type: 'text', text: `🤖 The agent mentioned @${user?.username ?? mentionedUserId}. Your input may be needed.` },
+          { via: 'dm' },
+        )
         await ctx.emitHook('mention', {
           sessionId,
           turnId,
           mentionedBy: 'agent',
-          mentionedUser: mentionedId,
+          mentionedUser: mentionedUserId,
         })
       }
       return next()

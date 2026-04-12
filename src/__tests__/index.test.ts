@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { createTestContext, createTestInstallContext } from '@openacp/plugin-sdk/testing'
 import plugin from '../index.js'
+import { createMockIdentityService } from './helpers.js'
 
 describe('@openacp/workspace-plugin', () => {
   it('has correct metadata', () => {
@@ -9,11 +10,13 @@ describe('@openacp/workspace-plugin', () => {
     expect(plugin.setup).toBeInstanceOf(Function)
   })
 
-  it('sets up without errors', async () => {
+  it('sets up without errors when identity service is available', async () => {
+    const identity = createMockIdentityService()
     const ctx = createTestContext({
       pluginName: '@openacp/workspace-plugin',
       pluginConfig: { enabled: true },
       permissions: plugin.permissions,
+      services: { identity },
     })
     await expect(plugin.setup(ctx)).resolves.not.toThrow()
   })

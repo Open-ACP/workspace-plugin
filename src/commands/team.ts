@@ -1,10 +1,10 @@
 import type { CommandDef } from '@openacp/plugin-sdk'
 import type { SessionStore } from '../session-store.js'
-import type { UserRegistry } from '../identity.js'
+import type { IdentityService } from '../types.js'
 
 export function makeTeamCommand(
   getSessionStore: (sid: string) => SessionStore,
-  registry: UserRegistry,
+  identity: IdentityService,
 ): CommandDef {
   return {
     name: 'team',
@@ -15,8 +15,8 @@ export function makeTeamCommand(
       const session = await getSessionStore(args.sessionId).get()
       if (!session) return { type: 'text', text: 'No workspace session data yet.' }
       const lines = await Promise.all(session.participants.map(async p => {
-        const user = await registry.getById(p.identityId)
-        const name = user?.displayName ?? p.identityId
+        const user = await identity.getUser(p.userId)
+        const name = user?.displayName ?? p.userId
         const statusIcon = { active: '🟢', idle: '🟡', offline: '⚫' }[p.status]
         return `${statusIcon} ${name} (${p.role})`
       }))

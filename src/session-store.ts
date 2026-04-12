@@ -12,7 +12,7 @@ export class SessionStore {
     return this.storage.get<SessionRecord>('session')
   }
 
-  async init(ownerIdentityId: string): Promise<SessionRecord> {
+  async init(ownerUserId: string): Promise<SessionRecord> {
     const existing = await this.get()
     if (existing) return existing
 
@@ -20,9 +20,9 @@ export class SessionStore {
     const record: SessionRecord = {
       sessionId: this.sessionId,
       type: 'solo',
-      owner: ownerIdentityId,
+      owner: ownerUserId,
       participants: [{
-        identityId: ownerIdentityId,
+        userId: ownerUserId,
         role: 'owner',
         joinedAt: now,
         status: 'active',
@@ -46,13 +46,13 @@ export class SessionStore {
     })
   }
 
-  async addParticipant(identityId: string): Promise<boolean> {
+  async addParticipant(userId: string): Promise<boolean> {
     const s = await this.get()
     if (!s) return false
-    if (s.participants.some(p => p.identityId === identityId)) return false
+    if (s.participants.some(p => p.userId === userId)) return false
     const now = new Date().toISOString()
     const participant: ParticipantRecord = {
-      identityId, role: 'member', joinedAt: now, status: 'active', lastSeen: now,
+      userId, role: 'member', joinedAt: now, status: 'active', lastSeen: now,
     }
     await this.storage.set('session', { ...s, participants: [...s.participants, participant] })
     return true
@@ -79,23 +79,23 @@ export class SessionStore {
     await this.storage.set('session', { ...s, tasks })
   }
 
-  async transferOwnership(newOwnerIdentityId: string): Promise<void> {
+  async transferOwnership(newOwnerUserId: string): Promise<void> {
     const s = await this.get()
     if (!s) return
     const participants = s.participants.map(p => ({
       ...p,
-      role: (p.identityId === newOwnerIdentityId ? 'owner'
-        : p.identityId === s.owner ? 'member' : p.role) as 'owner' | 'member',
+      role: (p.userId === newOwnerUserId ? 'owner'
+        : p.userId === s.owner ? 'member' : p.role) as 'owner' | 'member',
     }))
-    await this.storage.set('session', { ...s, owner: newOwnerIdentityId, participants })
+    await this.storage.set('session', { ...s, owner: newOwnerUserId, participants })
   }
 
-  async updatePresence(identityId: string, status: ParticipantRecord['status']): Promise<void> {
+  async updatePresence(userId: string, status: ParticipantRecord['status']): Promise<void> {
     const s = await this.get()
     if (!s) return
     const now = new Date().toISOString()
     const participants = s.participants.map(p =>
-      p.identityId === identityId ? { ...p, status, lastSeen: now } : p,
+      p.userId === userId ? { ...p, status, lastSeen: now } : p,
     )
     await this.storage.set('session', { ...s, participants })
   }

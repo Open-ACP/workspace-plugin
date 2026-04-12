@@ -1,13 +1,12 @@
 import type { CommandDef, PluginContext } from '@openacp/plugin-sdk'
 import type { SessionStore } from '../session-store.js'
-import type { UserRegistry } from '../identity.js'
-import { UserRegistry as UR } from '../identity.js'
+import type { IdentityService } from '../types.js'
+import { formatIdentityId } from '../types.js'
 import { extractMentions, resolveMentions } from '../mentions.js'
-import type { IdentitySource } from '../types.js'
 
 export function makePromoteCommand(
   getSessionStore: (sid: string) => SessionStore,
-  registry: UserRegistry,
+  identity: IdentityService,
   ctx: PluginContext,
 ): CommandDef {
   return {
@@ -22,30 +21,29 @@ export function makePromoteCommand(
       if (session?.type !== 'teamwork') return { type: 'error', message: 'Requires team mode.' }
 
       // Only the current owner can transfer ownership
-      const source = (args.channelId === 'sse' || args.channelId === 'api') ? 'api' : args.channelId as IdentitySource
-      const callerId = UR.buildIdentityId(source, args.userId)
-      if (callerId !== session.owner) {
+      const identityId = formatIdentityId(args.channelId, args.userId)
+      const caller = await identity.getUserByIdentity(identityId)
+      if (!caller || caller.userId !== session.owner) {
         return { type: 'error', message: 'Only the session owner can transfer ownership.' }
       }
 
       const mentions = extractMentions(args.raw)
       if (mentions.length === 0) return { type: 'error', message: 'Usage: /promote @user' }
 
-      const [newOwnerId] = await resolveMentions(mentions, registry)
-      if (!newOwnerId) return { type: 'error', message: `User @${mentions[0]} not found.` }
+      const [newOwnerUserId] = await resolveMentions(mentions, identity)
+      if (!newOwnerUserId) return { type: 'error', message: `User @${mentions[0]} not found.` }
 
-      // New owner must be an active participant in this session
-      const isParticipant = session.participants.some(p => p.identityId === newOwnerId)
+      const isParticipant = session.participants.some(p => p.userId === newOwnerUserId)
       if (!isParticipant) {
-        const user = await registry.getById(newOwnerId)
-        return { type: 'error', message: `${user?.displayName ?? newOwnerId} is not a participant in this session.` }
+        const user = await identity.getUser(newOwnerUserId)
+        return { type: 'error', message: `${user?.displayName ?? newOwnerUserId} is not a participant in this session.` }
       }
 
-      await store.transferOwnership(newOwnerId)
-      const user = await registry.getById(newOwnerId)
-      const name = user?.displayName ?? newOwnerId
+      await store.transferOwnership(newOwnerUserId)
+      const user = await identity.getUser(newOwnerUserId)
+      const name = user?.displayName ?? newOwnerUserId
 
-      await ctx.emitHook('promote', { sessionId: args.sessionId, from: callerId, to: newOwnerId })
+      await ctx.emitHook('promote', { sessionId: args.sessionId, from: caller.userId, to: newOwnerUserId })
 
       return { type: 'text', text: `✅ Session ownership transferred to ${name}.` }
     },

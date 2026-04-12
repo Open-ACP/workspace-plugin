@@ -1,10 +1,10 @@
 import type { CommandDef } from '@openacp/plugin-sdk'
 import type { SessionStore } from '../session-store.js'
-import type { UserRegistry } from '../identity.js'
+import type { IdentityService } from '../types.js'
 
 export function makeTasksCommand(
   getSessionStore: (sid: string) => SessionStore,
-  registry: UserRegistry,
+  identity: IdentityService,
 ): CommandDef {
   return {
     name: 'tasks',
@@ -16,7 +16,7 @@ export function makeTasksCommand(
       const open = session?.tasks.filter(t => t.status === 'open') ?? []
       if (open.length === 0) return { type: 'text', text: 'No open tasks.' }
       const lines = await Promise.all(open.map(async t => {
-        const assignee = t.assignee ? (await registry.getById(t.assignee))?.displayName ?? t.assignee : 'unassigned'
+        const assignee = t.assignee ? (await identity.getUser(t.assignee))?.displayName ?? t.assignee : 'unassigned'
         return `• [${t.id}] ${t.title} → ${assignee}`
       }))
       return { type: 'text', text: `**Open tasks:**\n${lines.join('\n')}` }

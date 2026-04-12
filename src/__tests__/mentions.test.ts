@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { extractMentions, resolveMentions } from '../mentions.js'
-import { createTestContext } from '@openacp/plugin-sdk/testing'
-import { UserRegistry } from '../identity.js'
+import { createMockIdentityService } from './helpers.js'
 
 describe('extractMentions', () => {
   it('returns empty array when no mentions', () => {
@@ -25,18 +24,16 @@ describe('extractMentions', () => {
 })
 
 describe('resolveMentions', () => {
-  it('resolves usernames to identityIds via registry', async () => {
-    const ctx = createTestContext({ pluginName: '@openacp/workspace-plugin', permissions: ['storage:read', 'storage:write'] })
-    const registry = new UserRegistry(ctx.storage)
-    await registry.upsert({ identityId: 'telegram:123', source: 'telegram', username: 'lucas' })
-    const ids = await resolveMentions(['lucas', 'unknown'], registry)
-    expect(ids).toEqual(['telegram:123'])
+  it('resolves usernames to userIds via IdentityService', async () => {
+    const identity = createMockIdentityService()
+    identity.addUser({ userId: 'u_abc', displayName: 'Lucas', username: 'lucas', role: 'member', identityId: 'telegram:123' })
+    const ids = await resolveMentions(['lucas', 'unknown'], identity)
+    expect(ids).toEqual(['u_abc'])
   })
 
   it('returns empty array when no usernames resolve', async () => {
-    const ctx = createTestContext({ pluginName: '@openacp/workspace-plugin', permissions: ['storage:read', 'storage:write'] })
-    const registry = new UserRegistry(ctx.storage)
-    const ids = await resolveMentions(['nobody'], registry)
+    const identity = createMockIdentityService()
+    const ids = await resolveMentions(['nobody'], identity)
     expect(ids).toEqual([])
   })
 })
