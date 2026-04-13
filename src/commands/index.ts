@@ -2,7 +2,6 @@ import type { PluginContext } from '@openacp/plugin-sdk'
 import type { IdentityService } from '../types.js'
 import type { SessionStore } from '../session-store.js'
 import { makeTeamworkCommand } from './teamwork.js'
-import { makeWhoamiCommand } from './whoami.js'
 import { makeTeamCommand } from './team.js'
 import { makeAssignCommand } from './assign.js'
 import { makeTasksCommand } from './tasks.js'
@@ -14,7 +13,7 @@ export function registerCommands(
   getSessionStore: (sid: string) => SessionStore,
 ): void {
   ctx.registerCommand(makeTeamworkCommand(getSessionStore, ctx, identity))
-  ctx.registerCommand(makeWhoamiCommand(identity))
+  // /whoami is owned by @openacp/identity (a required dependency) — no need to register here
   ctx.registerCommand(makeTeamCommand(getSessionStore, identity))
   ctx.registerCommand(makeAssignCommand(getSessionStore, identity, ctx))
   ctx.registerCommand(makeTasksCommand(getSessionStore, identity))

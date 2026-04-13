@@ -445,7 +445,7 @@ Other plugins subscribe via full namespaced names:
 | Command | Description |
 |---|---|
 | `/teamwork` | Activate teamwork mode (one-way, irreversible) |
-| `/whoami <name>` | Set your display name |
+| `/whoami @username [Display Name]` | Set your username and display name |
 | `/team` | List current participants and presence |
 | `/assign @user <task>` | Assign a task (teamwork sessions only) |
 | `/tasks` | List open tasks in this session |

@@ -66,11 +66,33 @@ export function registerAgentBeforePrompt(
 
       // Require a username before participating in team sessions.
       if (!sender?.username) {
-        const errorText = '⚠️ Team mode requires a username so others can @mention you.\n\nRun /whoami to set up your profile:\n/whoami @username [Display Name]\n\nExample: /whoami @alice Alice Nguyen'
-        // Emit as agent events so SSE clients clear their streaming/thinking state.
-        // text event shows the error; usage signals turn-end to the app.
-        eventBus.emit('agent:event', { sessionId, event: { type: 'text', content: errorText } })
-        eventBus.emit('agent:event', { sessionId, event: { type: 'usage' } })
+        const sourceAdapterId: string = (payload as any).sourceAdapterId ?? ''
+
+        if (sourceAdapterId === 'telegram' || sourceAdapterId === 'slack') {
+          // type: 'error' renders as "❌ Error: [text]" with HTML formatting on Telegram/Slack.
+          // No need for ⚠️ prefix — the adapter adds its own error indicator.
+          await ctx.sendMessage(sessionId, {
+            type: 'error',
+            text: [
+              'Team mode requires a username so others can @mention you.',
+              '',
+              'Set up your profile with:',
+              '/whoami @username [Display Name]',
+              '',
+              'Example: /whoami @alice Alice Nguyen',
+            ].join('\n'),
+          })
+        } else {
+          // SSE/App: message:failed removes the pending message and shows an error block.
+          // ErrorBlock renders plain text so no markdown here.
+          const reason = [
+            'Team mode requires a username so others can @mention you.',
+            '',
+            'Set up your profile with: /whoami @username [Display Name]',
+            'Example: /whoami @alice Alice Nguyen',
+          ].join('\n')
+          eventBus.emit('message:failed', { sessionId, turnId, reason })
+        }
         return null
       }
 
