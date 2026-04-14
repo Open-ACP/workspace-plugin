@@ -20,17 +20,7 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
 
-      - name: Swap local file deps to npm for CI
-        run: |
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
-            pkg.devDependencies['@openacp/cli'] = pkg.peerDependencies['@openacp/cli'];
-            pkg.devDependencies['@openacp/plugin-sdk'] = pkg.peerDependencies['@openacp/cli'];
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
       - name: Set version from tag
         run: |

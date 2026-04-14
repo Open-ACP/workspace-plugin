@@ -1,6 +1,6 @@
 {
   "name": "@openacp/workspace-plugin",
-  "version": "2026.414.1",
+  "version": "2026.414.2",
   "description": "Multi-user collaboration for shared OpenACP sessions",
   "type": "module",
   "main": "dist/index.js",
@@ -28,8 +28,8 @@
     "nanoid": "^5.0.0"
   },
   "devDependencies": {
-    "@openacp/cli": "file:../OpenACP",
-    "@openacp/plugin-sdk": "file:../OpenACP/packages/plugin-sdk",
+    "@openacp/cli": "^2026.413.1",
+    "@openacp/plugin-sdk": "^2026.413.1",
     "@types/node": "^25.0.0",
     "typescript": "^5.4.0",
     "vitest": "^3.0.0"
