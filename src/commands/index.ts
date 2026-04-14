@@ -6,12 +6,15 @@ import { makeTeamCommand } from './team.js'
 import { makeAssignCommand } from './assign.js'
 import { makeTasksCommand } from './tasks.js'
 import { makePromoteCommand } from './promote.js'
+import { makeWorkspaceStatusCommand } from './workspace-status.js'
 
 export function registerCommands(
   ctx: PluginContext,
   identity: IdentityService,
   getSessionStore: (sid: string) => SessionStore,
+  pluginVersion: string,
 ): void {
+  ctx.registerCommand(makeWorkspaceStatusCommand(getSessionStore, pluginVersion))
   ctx.registerCommand(makeTeamworkCommand(getSessionStore, ctx, identity))
   // /whoami is owned by @openacp/identity (a required dependency) — no need to register here
   ctx.registerCommand(makeTeamCommand(getSessionStore, identity))

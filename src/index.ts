@@ -73,7 +73,9 @@ const plugin: OpenACPPlugin = {
     ctx.defineHook('mention')
 
     // Register chat commands
-    registerCommands(ctx, identity, getSessionStore)
+    registerCommands(ctx, identity, getSessionStore, plugin.version)
+
+    ctx.log.info('@openacp/workspace-plugin: commands registered [workspace, teamwork, team, assign, tasks, promote]')
 
     // Register REST/SSE routes via api-server service (optional dependency).
     const apiServer = ctx.getService<{ registerPlugin(prefix: string, plugin: any, opts?: { auth?: boolean }): void }>('api-server')
@@ -113,7 +115,7 @@ const plugin: OpenACPPlugin = {
       },
     })
 
-    ctx.log.info('@openacp/workspace-plugin ready')
+    ctx.log.info('@openacp/workspace-plugin ready — use /workspace to check status')
   },
 
   async teardown(): Promise<void> {
