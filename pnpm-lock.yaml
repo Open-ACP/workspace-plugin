@@ -13,11 +13,11 @@ importers:
         version: 5.1.7
     devDependencies:
       '@openacp/cli':
-        specifier: ^2026.413.1
-        version: 2026.413.1(openapi-types@12.1.3)
+        specifier: ^2026.414.1
+        version: 2026.414.1(openapi-types@12.1.3)
       '@openacp/plugin-sdk':
-        specifier: ^2026.413.1
-        version: 2026.413.1(@openacp/cli@2026.413.1(openapi-types@12.1.3))
+        specifier: ^2026.414.1
+        version: 2026.414.1(@openacp/cli@2026.414.1(openapi-types@12.1.3))
       '@types/node':
         specifier: ^25.0.0
         version: 25.6.0
@@ -350,13 +350,13 @@ packages:
     resolution: {integrity: sha512-9I2Zn6+NJLfaGoz9jN3lpwDgAYvfGeNYdbAIjJOqzs4Tpc+VU3Jqq4IofSUBKajiDS8k9fZIg18/z13mpk1bsA==}
     engines: {node: '>=8'}
 
-  '@openacp/cli@2026.413.1':
-    resolution: {integrity: sha512-8olqNUon6RJb95foyjIgNnRkiw+J/BMJN0E6x7v6torrhI3LqkWvuFDhNebMai+UhkgIWeVzrgFRNwn6Tq3uJA==}
+  '@openacp/cli@2026.414.1':
+    resolution: {integrity: sha512-N3YzHft+ojCgLj9YInZNeWcuCVtvVHhLAFQPRBQWQ4XB0s3K4lFDIZ0IO28iZwH7guCpAuSD957aD2Uw5qy4Pw==}
     engines: {node: '>=20'}
     hasBin: true
 
-  '@openacp/plugin-sdk@2026.413.1':
-    resolution: {integrity: sha512-3H2WS7JI5M/5tBC5pXAt7OvB7fRI+THRfgzyfH6vVmTHqIJyeBzHAMXJYZ+3nJ0CwENEZFlNoduLvfyErknO4g==}
+  '@openacp/plugin-sdk@2026.414.1':
+    resolution: {integrity: sha512-jMiZorykHFlz9tVOqq5eqC1lJQA3J8bK52xEH0TptY80kjQooynNKVaGYRkfRMl/WYo03krVqjVq9EfLVjBjCQ==}
     peerDependencies:
       '@openacp/cli': '>=0.6.0'
 
@@ -1526,7 +1526,7 @@ snapshots:
 
   '@lukeed/ms@2.0.2': {}
 
-  '@openacp/cli@2026.413.1(openapi-types@12.1.3)':
+  '@openacp/cli@2026.414.1(openapi-types@12.1.3)':
     dependencies:
       '@agentclientprotocol/claude-agent-acp': 0.24.2
       '@agentclientprotocol/sdk': 0.16.1(zod@3.25.76)
@@ -1557,9 +1557,9 @@ snapshots:
       - openapi-types
       - supports-color
 
-  '@openacp/plugin-sdk@2026.413.1(@openacp/cli@2026.413.1(openapi-types@12.1.3))':
+  '@openacp/plugin-sdk@2026.414.1(@openacp/cli@2026.414.1(openapi-types@12.1.3))':
     dependencies:
-      '@openacp/cli': 2026.413.1(openapi-types@12.1.3)
+      '@openacp/cli': 2026.414.1(openapi-types@12.1.3)
 
   '@pinojs/redact@0.4.0': {}
 
