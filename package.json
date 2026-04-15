@@ -1,6 +1,6 @@
 {
   "name": "@openacp/workspace-plugin",
-  "version": "2026.414.4",
+  "version": "2026.415.1",
   "description": "Multi-user collaboration for shared OpenACP sessions",
   "type": "module",
   "main": "dist/index.js",
