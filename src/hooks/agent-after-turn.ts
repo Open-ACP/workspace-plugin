@@ -15,7 +15,16 @@ export function registerAgentAfterTurn(
       const usernames = extractMentions(fullText)
       if (usernames.length === 0) return next()
 
+      ctx.log.debug(`[workspace] mentions detected — session=${sessionId} turn=${turnId} usernames=${usernames.join(',')}`)
+
       const mentionedUserIds = await resolveMentions(usernames, identity)
+      if (mentionedUserIds.length === 0) {
+        ctx.log.debug(`[workspace] no mentions resolved — usernames not found in identity (${usernames.join(',')})`)
+        return next()
+      }
+
+      ctx.log.info(`[workspace] sending mention notifications — session=${sessionId} users=${mentionedUserIds.join(',')}`)
+
       // ctx.notify exists on PluginContext but SDK types lag behind — cast through any
       const notify = (ctx as any).notify?.bind(ctx) as
         | ((t: any, m: any, o?: any) => void)
@@ -30,6 +39,8 @@ export function registerAgentAfterTurn(
         const user = await identity.getUser(mentionedUserId)
         const username = user?.username ?? mentionedUserId
         const context = extractMentionContext(fullText, username, 150)
+
+        ctx.log.debug(`[workspace] dispatching mention notification — userId=${mentionedUserId} username=${username}`)
 
         notify?.(
           { userId: mentionedUserId },
